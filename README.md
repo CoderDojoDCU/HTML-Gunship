@@ -216,3 +216,138 @@ Now we add an onload function for each image created and use it to check if all 
 	};
 
 That's it. We now have our ImageCache created.
+
+Let's look at how we are going to draw our game images on to the canvas. The drawCtx gives us access to a number of methods which we can use to draw on the canvas. For the purposes of our game we're only interested in one of these - it's called the drawImage method. You should have an image called Gunship.png in your images directory. We can draw this image on our canvas by adding the following line into gunship.js immediately after the line that calls fillRect.
+
+	drawCtx.drawImage(imageCache.get('images/gunship.png'),0,0,39,36,0,0,39,36);
+	
+Lets' look at the parameters to this function:
+	- The first parameter is a reference to the image to draw. We get this from our image cache.
+	- The next two parameters are the location in this image to begin copying onto our canvas.
+	- The 4th and 5th parameters are the size of the image to be copied to the canvas.
+	- The 6th and 7th parameters specify the location on the canvas to begin drawing the image
+	- The 8th and 9th parameters specify the size of the area into which the image should be copied.
+In effect this function copies a region of a source image onto a specified region of the canvas.
+	
+Of course you will have noticed that this presumes that the gunship.png image is in our imageCache. So to accomplish this we need to add this image to the list of images to be loaded by the image cache. To do this we change the call to imageCache.load in Gunship.js to read as follows:
+
+	imageCache.load(['images/terrain.png','images/gunship.png']);
+
+So we now know how to draw a single static image on our canvas. But our sprites are composed of a series of images that are drawn in sequence to give the illusion of movement.
+
+There should now be an image in the images directory called sprites.png. If you look at this image you will notice that it contains a series of images arranged horizontally which if drawn in sequence would have the effect of creating the illusion of movement.
+
+Our Gunship has two images which is drawn in sequence wll give the illusion of the rotors spinning.
+
+There are four images for the enemy which if drawn in sequence will look like they are moving their armour at the front.
+
+There are eight images for an explosion.
+
+By having all of these images loaded into a single image we can load all of the games images required in a single image - thus making our game faster to load.
+
+Building the Sprite Class
+-------------------------
+We're going to create a javascript class to manage the sprite. This class will be responsible for the animation of the sprite (i.e. choosing what frame of the sprite to display at a given time) and also for it's position on the screen.
+
+Firstly though we need to get the concept of how to sequence the frames sorted. Every game has the concept of a game clock. This is what's used to drive the "automatic" parts of the game (generally called the game AI). In our case we're going to synchronise the game clock along with the clock we use to draw the sprites on the screen. This gives us a mechanism that will allow us to sequence the drawing of the different image frames of our sprites.
+
+For the purposes of this game we're going to assume that our clock ticks 60 times a second. Therefore if we want our sprite to display it's frames at a rate of 4 frames a second - then with 60 clock ticks per second we need to update the sprite frame every 60/4 = 15 clock ticks. So for each sprite, we need to calculate the number of clock ticks between sprite frames depending on how fast we want that sprites animation to run.
+
+Bearing that in mind let's start to build our sprite class.
+
+Create a new file in your editor and type in the following to create the Sprite class:
+
+	function Sprite() {
+	}
+	
+Save this in the scripts directory as Sprite.js
+So let's look at the functionality that we want our sprite class to have. We split the drawing of the appropriate frame into two parts. One part (update) decides which frame of the sprite should be drawn, and the second part (render) then actually draws the image using the selected frame at the current position of that sprite on the screen.
+
+	// Decide which frame of our sprite to display. Based on the number of clock ticks (clock 
+	// frames) that have passed since the last time we were called.
+	this.update = function(framesElapsed) {
+	};
+	
+	// Render the current sprite frame at the current sprite location. Is passed in the drawing 
+	// context for the canvas on which the frame should be drawn.
+	this.render = function(drawCtx) {
+	};
+	
+	// These two methods allow our program to set the current position of the sprite and to 
+	// query the current position of the sprite.
+	this.setPosition = function(top, left) {
+	};
+	
+	this.getPosition = function() {
+	};
+	
+	// This method allows us to query the size of the current sprite.
+	this.getSize = function() {
+	};
+	
+	// Some sprites (e.g. explosions) just run through their animation once and then they're 
+	// finished. For those sprites we need to know when they are finished so that we can remove
+	// them from our list of sprites.
+	this.isDone = function() {
+	};
+	
+Now lets's look at the information we need in order to define a sprite and add parameters to our class function to pass those values into our class. We revise our classes function declaration to look like this:
+
+	// This is our sprite class
+	// Parameters:
+	//	spriteMap - a reference to the image containing our sprite map
+	//	top, left - position where our sprite starts in the image map
+	//	width, height - the size of an individual frame of our sprite
+	//  fr - the frame rate for switching between frames of our sprite
+	//	frames - an array specifying the order in which to render frames
+	//  frameDir - the direction in which sprite frames are laid out
+	//	doOnce - render the sprite frameset once and then we're done
+	function Sprite(spriteMap, top, left, width, height, fr, frames, frameDir, doOnce ) {
+	...
+	}
+	
+Then we add internal variables to our sprite class that will store the information passed into our class function in case we need it again. Add these lines just after the curly bracket after the function line so that it looks like this:
+
+
+	function Sprite(spriteMap, top, left, width, height, fr, frames, frameDir, doOnce ) {
+		// These variables store the definition of our sprite.
+		var theSpriteMap = spriteMap;
+		var srcPos = { left: left, top: top };
+		var size = { w: width, h: height };
+		var frameRate = fr;
+		var frameSet = frames;
+		var dir = frameDir;
+		var once = doOnce;
+
+		...
+	}
+	
+Now we need to look at other internal state for our sprite that we will need as we develop it. These variables are used to store information about the sprite that is calculated as the game runs.
+
+	// These variables store the internal state of our sprite.
+	var frameIdx = 0;	// Index into the frameSet pointing to the current frame to render.
+	var curSpritePos = { top :0, left: 0};
+	var clockFrame = 0;
+	var frameDivisor = frameRate > 0 ? 60/frameRate : 0;
+	
+The last line here introduces some new syntax. This is like writing an if - then - else all on one line. It's called a ternary operator. It breaks down as follows:
+	
+	var frameDivisor = ...
+	
+We're just declaring a variable and we're going to assign it some initial value.
+
+	frameRate > 0 ? 60/frameRate : 0;
+	
+The bit before the question mark is treated like an if condition.
+
+The next bit (before the :) is the value to return if the condition evaluates to true. The remainder of the statment is the value to return if the condition evaluates to false. The above declaration is the same as if I had written:
+
+	var frameDivisor;
+	if ( frameRate > 0 ) {
+		frameDivisor = 60/frameRate;
+	} else {
+		frameDivisor = 0;
+	}
+	
+But us lazy software developers find it much quicker to use:
+	var frameDivisor = frameRate > 0 ? 60/frameRate : 0;
