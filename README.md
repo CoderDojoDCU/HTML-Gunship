@@ -351,3 +351,96 @@ The next bit (before the :) is the value to return if the condition evaluates to
 	
 But us lazy software developers find it much quicker to use:
 	var frameDivisor = frameRate > 0 ? 60/frameRate : 0;
+
+Now let's complete the "easy" functions of our Sprite class.
+
+The isDone method is just the value of the internal "done" variable.
+
+	this.isDone = function() { 
+		return done;
+	}
+
+The getSize method simply returns the width and height of the sprite as passed into the constructor. Note that since we store the width and height in a JSON object internally we don't want to pass back a reference to our internal size variables so we create one and return it when the getSize function is called using JSON notation:
+
+	this.getSize = function() {
+		return { w: size.w, h: size.h};
+	}
+	
+We do the same for the getPosition function:
+
+	this.getPosition = function() {
+		return {top: curSpritePos.top, left: curSpritePos.left; };
+	}
+
+If a caller wants to set the location of the sprite on the screen they will call the setPosition function so we use this to update the internal sprite location:
+
+	this.setPosition = function( top, left ) {
+		curSpritePos.top = top;
+		curSpritePos.left = left;
+	}
+	
+Now we just need to complete the two "update" and "render" functions.
+
+The "update" function is responsible for calculating the frame that we're next going to display for out sprite. However since we also use this class to manipulate the bullets (which aren't really sprites - just single images) we need can disregard the calculation if the frame divisor is 0 (which is the case for non-sprites).
+
+	this.update = function(framesElapsed) {
+		if ( frameDivisor > 0 ) {
+			clockFrame += framesElapsed;
+			// Calculate out how many frames we have moved since this sprite was created.
+			var moveFrames = Math.floor(clockFrame/frameDivisor);
+			// 0, 1 ,2 ,3, 2, 1,
+			// We use the mod operator (%) to calculate the
+			// remainder when moveFrames is divided by the number
+			// of steps in our frameset. This will give us a value
+			// that cycles from 0 to frameSet.length-1 repeatedly
+			// as moveFrames increases.
+			frameIdx = moveFrames % frameSet.length;
+			// For single animations we're finished when the number
+			// of frames we've moved exceeds the number of frames
+			// in our frameSet.
+			done = once && moveFrames > frameSet.length;
+		}
+	};
+
+New syntax:
+	- clockFrame += framesElapsed 
+	  is the same as writing clockFrame = clockFrame + framesElapsed
+	  it's just a shorter way of writing this.
+	- var moveFrames = Math.floor(clockFrame/frameDivisor)
+	  The Math.floor function returns the integer part of a value so 1.234 becomes 1, but 1.999 is also 1 i.e. it's not rounded.
+	- frameIdx = moveFrames % framesSet.length
+	  The modulus operator (%) returns the remainder when the first value is divided by the second. We use this to cycle through the set of frames in the frameset.
+	- done = once && moveFrames > frameSet.length
+	  The "done" variable is assigned the value true or false based on the result of the expression to the right of the equals sign. You can assign the result of a logical expression to a variable.
+
+Once this function has completed frameIdx now contains the index in frameSet of the frame to be displayed. Also, the "done" variable will be true if the animation is finished (like for explosions).
+
+So our render function now just needs to calculate the location of the sprite frame in our sprite map and draw it on the canvas.
+
+	this.render = function(drawCtx) {
+		// If we're done we don't need to do anything
+		if ( !done ) {
+			// Get the frameNo from the frameSet array
+			var frameNo = frameSet[frameIdx];
+			var left = srcPos.left,
+				top = srcPos.top;
+			// Now calculate the offset to the start of the image
+			// we want in our sprite map.
+			if (dir == 'horizontal' ) {
+				left += frameNo * size.w;
+			} else {
+				top += frameNo * size.h;
+			}
+			
+			// Here we draw the image using the calculated left and top to find the location
+			// of the image in the sprite map and curSpritePos to specify the position that 
+			// we're going to draw frame on the canvas.
+			drawCtx.drawImage(theSpriteMap, left, top, size.w,
+				size.h, curSpritePos.left, curSpritePos.top,
+				size.w, size.h);
+		}
+	};
+
+Finally to use this new class in our project we need to include it in the set of scripts in the HTML file.
+
+		<script src="scripts/Sprite.js" type="text/javascript"></script>
