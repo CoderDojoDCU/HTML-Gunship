@@ -14,8 +14,8 @@ function Sprite(spriteMap, top, left, width, height, fr, frames, frameDir, doOnc
 	var size = { w: width, h: height };
 	var frameRate = fr;
 	var frameSet = frames;
-	var dir = frameDir;
-	var once = doOnce;
+	var dir = frameDir || 'horizontal';	// Default to 'horizontal' if not provided
+	var once = doOnce || false; // Default to false if not provided
 	
 	// These variables store the internal state of our sprite.
 	var frameIdx = 0;	// Index into the frameSet pointing to the current frame to render.
@@ -68,7 +68,6 @@ function Sprite(spriteMap, top, left, width, height, fr, frames, frameDir, doOnc
 			} else {
 				top += frameNo * size.h;
 			}
-			
 			// Here we draw the image using the calculated left and top to find the location
 			// of the image in the sprite map and curSpritePos to specify the position that 
 			// we're going to draw frame on the canvas.

@@ -532,3 +532,73 @@ Finally to use this new class in our project we need to include it in the set of
 ``` html
 <script src="scripts/Sprite.js" type="text/javascript"></script>
 ```
+
+## Testing the Sprite Class
+
+Now that we've build our sprite class we should test it before we go any further. By testing it now (rather than when we're finished building the entire game) it's easier to find any bugs that we may have introduced in our class.
+
+We'll add some code to the gunship.js file which will create the sprite and then create a test clock to animate it.
+
+First we need to load the sprite map into our image cache. So we just add it to the array of images to be loaded into the image cache:
+
+```javascript
+	imageCache.load(['images/terrain.png','images/gunship.png', 'images/sprites.png']);
+```
+
+Now we can use this image in our code. Previously we had drawn the gunship image on our canvas. Let's replace this with an animated enemy. So we can remove the call to drawImage that draws the gunship on the canvas. (So remove this line:
+
+```javascript
+	drawCtx.drawImage(imageCache.get('images/gunship.png'),0,0,39,39,0,0,39,39);
+```
+
+And we replace it with the following lines:
+
+```javascript
+	sprite = new Sprite(imageCache.get('images/sprites.png'),78,0,80,39,10,[0,1,2,3,2,1],'horizontal');
+	sprite.setPosition(0,0);
+	testSprite();
+```
+
+We also need to add a new variable to store the reference to the sprite that we just created. We add this below the declaration of the imageCache so that it is accessible. The code after the imageCache declaration in gunship.js should look like this now:
+
+```javascript
+	var imageCache = new ImageCache();
+	var sprite = null;
+```
+
+The first line creates a Sprite class and we pass it a reference to the sprite image map and tell it the location of the sprite we want to draw.
+
+This code calls a function we haven't written yet called testSprite. So let's add this now:
+
+```javascript
+	function testSprite() {
+		sprite.update(5);
+		drawCtx.fillRect(0,0,gameCanvas.width,gameCanvas.height);
+		sprite.render(drawCtx);
+		setTimeout(testSprite,100);
+	}
+```
+
+This function calls the sprite update method (which calculates the next frame of the sprite to display) and tells it to advance 5 clock ticks.
+
+We then call drawCtx.fillRect to blank the canvas before every frame is drawn.
+
+Finally we call sprite.render and then set a timeout to call this function again in 100 milliseconds.
+
+This should draw an animated enemy on the screen.
+
+### Providing default values
+You may have noticed that we don't pass the last parameter to our Sprite function to create a sprite. This is the doOnce parameter. The reason for this is that if we omit a parameter to a function JavaScript will pass in a special value of *undefined*. If we treat such a parameter as if we are expecting a value of true or false, it will be evaluated as if it were false. Hence by omitting this parameter we implicitly pass a value of *false* for it.
+
+This feature can be used to provide default values for parameters to a function using the following syntax:
+
+```javascript
+	var once = doOnce || false;		// Means if doOnce is true once will get the value true.
+```
+
+We can do the same for the direction parameter also if we wish to default it's value to horizontal:
+
+```javascript
+	var dir = frameDir || 'horizontal';	// Default to 'horizontal' if not provided
+```
+
