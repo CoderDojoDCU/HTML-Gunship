@@ -541,19 +541,19 @@ We'll add some code to the gunship.js file which will create the sprite and then
 
 First we need to load the sprite map into our image cache. So we just add it to the array of images to be loaded into the image cache:
 
-```javascript
+``` javascript
 	imageCache.load(['images/terrain.png','images/gunship.png', 'images/sprites.png']);
 ```
 
 Now we can use this image in our code. Previously we had drawn the gunship image on our canvas. Let's replace this with an animated enemy. So we can remove the call to drawImage that draws the gunship on the canvas. (So remove this line:
 
-```javascript
+``` javascript
 	drawCtx.drawImage(imageCache.get('images/gunship.png'),0,0,39,39,0,0,39,39);
 ```
 
 And we replace it with the following lines:
 
-```javascript
+``` javascript
 	sprite = new Sprite(imageCache.get('images/sprites.png'),78,0,80,39,10,[0,1,2,3,2,1],'horizontal');
 	sprite.setPosition(0,0);
 	testSprite();
@@ -561,7 +561,7 @@ And we replace it with the following lines:
 
 We also need to add a new variable to store the reference to the sprite that we just created. We add this below the declaration of the imageCache so that it is accessible. The code after the imageCache declaration in gunship.js should look like this now:
 
-```javascript
+``` javascript
 	var imageCache = new ImageCache();
 	var sprite = null;
 ```
@@ -570,7 +570,7 @@ The first line creates a Sprite class and we pass it a reference to the sprite i
 
 This code calls a function we haven't written yet called testSprite. So let's add this now:
 
-```javascript
+``` javascript
 	function testSprite() {
 		sprite.update(5);
 		drawCtx.fillRect(0,0,gameCanvas.width,gameCanvas.height);
@@ -592,13 +592,161 @@ You may have noticed that we don't pass the last parameter to our Sprite functio
 
 This feature can be used to provide default values for parameters to a function using the following syntax:
 
-```javascript
+``` javascript
 	var once = doOnce || false;		// Means if doOnce is true once will get the value true.
 ```
 
 We can do the same for the direction parameter also if we wish to default it's value to horizontal:
 
-```javascript
+``` javascript
 	var dir = frameDir || 'horizontal';	// Default to 'horizontal' if not provided
 ```
 
+## Providing a clock for our game
+Sprites, unlike static images, require continuous updating in order to generate their animation. So we need a clock of some sort to drive all of the sprites in our game. We will also be able to use this clock to monitor and update the game state according as the game is played.
+
+We're going to count our clock ticks in terms of the number of frames of the game that have elapsed. i.e. based on a frame rate of 60 frames per second we arrange it so that our clock ticks 60 times per second.
+
+Let's consider the functionality that we would require of a clock class.
+- We need to be able to tell our clock what to do every time the clock ticks. This should also tell us how many game frames have elapsed since the last time it was called. Ideally this will always be 1, but it may be more. We're going to call this function ```registerGameStep```.
+- We need to be able to tell the clock when to start ticking. We're going to call this function ```start```
+
+Ideally then we could rewrite the portion of gunship.js that we wrote to test our sprite class as follows:
+``` javascript
+	// Create our game clock that's going to animate our sprites
+	var gameClock = new GameClock();
+	imageCache.ready(function() {
+		var pattern = drawCtx.createPattern(imageCache.get('images/terrain.png'),"repeat");
+		drawCtx.fillStyle = pattern;
+		drawCtx.fillRect(0,0,gameCanvas.width,gameCanvas.height);
+		// Create a sprite
+		sprite = new Sprite(imageCache.get('images/sprites.png'),78,0,80,39,10,[0,1,2,3,2,1],'horizontal');
+		sprite.setPosition(0,0);
+		// Register a step with the clock that will cause the animation of our sprite
+		gameClock.registerStep(function(framesElapsed) {
+			testSprite(framesElapsed);
+		});
+		
+		// Now that we have our clock all configured - tell it to start ticking.
+		gameClock.start();
+	});
+```
+
+Also, since our game clock is now responsible for calling the testSprite method we can remove the call to ```setTimeout()``` so that it looks like this. Note how we now pass the number of frames that have elapsed since last called to the ```sprite.update()``` method instead of the value of 5 that we had hard-coded previously.
+
+``` javascript
+	function testSprite(framesElapsed) {
+		sprite.update(framesElapsed);
+		drawCtx.fillRect(0,0,gameCanvas.width,gameCanvas.height);
+		sprite.render(drawCtx);
+	}
+```
+
+So now that we know what we want our game clock class to look like, let's go and write it.
+
+### The GameClock class
+We start a new file in our scripts directory called GameClock.js and we start it with the standard syntax we use for defining a new JavaScript class:
+
+``` javascript
+function GameClock() {
+}
+```
+
+Based on what we know our clock class is going to look like to it's user we know that we're going to have to store a list of possible functions to be executed each time the clock ticks. Typically we store these in an array. So we declare storage for these in our class as follows:
+
+``` javascript
+	var stepFunctions = [];
+```
+
+Additionally in order to be able to tell how many frames have elapsed we need to "remember" the time at which the tick method was last called so we store the last tick time:
+
+``` javascript
+	var lastTickTime = 0;
+```
+
+Also, since we're working on a frame rate of 60 frames per second we can calculate the number of milliseconds that elapse between frames as this won't change.
+
+``` javascript
+	var millsecsPerFrame = 1000/60;
+```
+
+We also keep track of the current frame numbers which is effectively the number of times we have ticked since the clock was started. We also have one other variable that we use to capture a number that the browser gives us back to control the way in which the class is called. We don't really need it right now, however we'll capture it here so that we have it in the future if we need it.
+
+``` javascript
+	var currentFrameNo = 0;
+	var animationId = 0;	// Returned by RequestAnimationFrame
+```
+
+Let's have a look at our start method. It's job is to start the clock ticking. To do this it calls a new HTML5 browser method which will give us a clock rate of approximately 60 frames per second. Every time the HTML5 clock ticks we want to figure out what needs to be carried out in our game.
+
+``` javascript
+	this.start = function() {
+		animationId = requestAnimationFrame(clockTick);
+	};
+```
+
+This uses the ```requestAnimationFrame()``` method which is a new method available to us in HTML5. However because HTML5 is very new it may not be implemented using the same name in each browser. Therefore we use the following construct to figure out the correct HTML5 function to call. We define a variable which points to the actual function to be called as follows:
+
+``` javascript
+	var requestAnimationFrame = 
+			window.requestAnimationFrame ||
+			window.mozRequestAnimationFrame ||
+			window.webkitRequestAnimationFrame ||
+			window.msRequestAnimationFrame ||
+			function( animationCallback ) { window.setTimeout(animationCallback, millsecsPerFrame);};
+```
+
+This uses the same syntax that we use for defining default values as we saw previously. If it can't find a built-in function to call it falls back on creating a ```window.setTimeout()``` that gets called 60 times a second.
+
+To register a clock tick function we simply put the supplied function into the array of step functions:
+
+``` javascript
+	this.registerStep = function(stepFunction) {
+		stepFunctions.push(stepFunction);
+	};
+```
+
+So now all we have to do is write the clockTick function that the start method registers with the ```requestAnimationFrame()``` method.
+
+The clockTick function that we registered with ```requestAnimationFrame()``` is called with the current time given in milliseconds. However because it can could be called using the ```window.setTimeout()``` function it might not be passed the current time. We can default the current time if it's not provided using the standard method of providing default values:
+
+``` javascript
+	function clockTick(timestamp) {
+		// If timestamp isn't passed to this function, then
+		// we calculate the current time using the built-in
+		// Date class.
+		timestamp = timestamp || Date.now();
+		...
+	}
+```
+
+Now we need to calculate the amount of time that has elapsed since we were last called. Then we figure out the number of frames this represents. We use this to keep track of the current frame number for the game.
+
+``` javascript
+		var elapsed = timestamp - lastTickTime;
+		var framesSinceLastTick = Math.floor(elapsed/millsecsPerFrame);
+		currentFrameNo += framesSinceLastTick;
+```
+
+If some frames have elapsed since we were last called, then we need to call our step functions and record the last time we executed them. We only record the ```lastTickTime``` if some frames have elapsed to make sure that we calculate the number of elapsed frames correctly.
+
+``` javascript
+		if ( framesSinceLastTick > 0 ) {
+			stepFunctions.forEach(function(fn) { 
+				fn(framesSinceLastTick, currentFrameNo);
+			});
+			lastTickTime = timestamp;
+		}
+```
+
+And then finally we schedule this function to be called again on the next tick.
+
+``` javascript
+		animationId = requestAnimationFrame(clockTick);
+```
+
+With our GameClock class complete now we just need to include it in our set of loaded scripts. So add the following <script> tags to your gunship.html file:
+
+``` html
+		<script src="scripts/GameClock.js" type="text/javascript"></script>
+```

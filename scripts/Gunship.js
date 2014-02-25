@@ -4,6 +4,7 @@ $(document).ready(function() {
 	// HTML <img src='images/terrain.png'/>
 	var imageCache = new ImageCache();
 	var sprite = null;
+	var gameClock = new GameClock();
 	imageCache.ready(function() {
 		var pattern = drawCtx.createPattern(imageCache.get('images/terrain.png'),"repeat");
 		drawCtx.fillStyle = pattern;
@@ -11,15 +12,18 @@ $(document).ready(function() {
 //		drawCtx.drawImage(imageCache.get('images/gunship.png'),0,0,39,39,0,0,39,39);
 		sprite = new Sprite(imageCache.get('images/sprites.png'),78,0,80,39,10,[0,1,2,3,2,1],'horizontal');
 		sprite.setPosition(0,0);
-		testSprite();
+		gameClock.registerStep(function(framesElapsed) {
+			testSprite(framesElapsed);
+		});
+		
+		gameClock.start();
 	});
 	imageCache.load(['images/terrain.png','images/gunship.png', 'images/sprites.png']);
 	
-	function testSprite() {
-		sprite.update(5);
+	function testSprite(framesElapsed) {
+		sprite.update(framesElapsed);
 		drawCtx.fillRect(0,0,gameCanvas.width,gameCanvas.height);
 		sprite.render(drawCtx);
-		setTimeout(testSprite,100);
 	}
 	
 	
