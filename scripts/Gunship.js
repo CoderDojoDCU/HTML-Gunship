@@ -9,9 +9,8 @@ $(document).ready(function() {
 		var pattern = drawCtx.createPattern(imageCache.get('images/terrain.png'),"repeat");
 		drawCtx.fillStyle = pattern;
 		drawCtx.fillRect(0,0,gameCanvas.width,gameCanvas.height);
-//		drawCtx.drawImage(imageCache.get('images/gunship.png'),0,0,39,39,0,0,39,39);
-		sprite = new Sprite(imageCache.get('images/sprites.png'),78,0,80,39,10,[0,1,2,3,2,1],'horizontal');
-		sprite.setPosition(0,0);
+		sprite = new AutoSprite(-1.66,'horizontal',imageCache.get('images/sprites.png'),78,0,80,39,10,[0,1,2,3,2,1],'horizontal');
+		sprite.setPosition(300,500);
 		gameClock.registerStep(function(framesElapsed) {
 			testSprite(framesElapsed);
 		});

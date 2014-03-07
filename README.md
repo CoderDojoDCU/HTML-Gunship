@@ -750,3 +750,96 @@ With our GameClock class complete now we just need to include it in our set of l
 ``` html
 		<script src="scripts/GameClock.js" type="text/javascript"></script>
 ```
+
+### Automating Sprites
+
+Our game has two kinds of sprites - we have the player which moves in response to the keys on the keyboard.
+
+On the other hand we have the enemies and the bullets which move on their own (until they collide with something of course).
+
+We can use our existing sprite class to represent the player sprite and call setPosition on it to change it's position. However we need to do something different for the bullets and the enemies. These sprites need to move automatically once they have been created.
+
+These automated sprites are just ordinary sprites but they also change their position automatically. Therefore they have all of the functionality of a sprite (i.e. they animate), but in addition when they update their state they also change their position.
+
+One solution to this problem is to copy all of the code we have in our Sprite class and then just modify the update function to do the additional positioning.
+
+However this isn't an ideal solution. Suppose we found a problem in our sprite class and we needed to fix it, we would then have to fix it in two places.
+
+Wouldn't it be great if there was a way to use the sprite class as it is and just change the functionality of the update function.
+
+Happily there is a way to do this. We call it sub-classing. 
+
+Sub classing allows us to create a new class that is based on an existing class. In our sub-class we can provide additional functionality and over-ride some of the functionality of the base class.
+
+For our scenario, we need to sub-class our sprite class and then over-ride the update function to reposition the sprite each time update is called. If at some point in the future we need to make a change to our sprite class, then our sub-class will also benefit from those changes automatically.
+
+So let's create a new class AutoSprite - (for automated sprite). AutoSprite will do everthing that Sprite does except that we want to add some functionality to the update function.
+
+Therefore our AutoSprite class will take all of the same parameters as our Sprite class. Additionally our AutoSprite class requires two more parameters:
+	- direction - horizontal or vertical - indicating the direction in which the sprite will move.
+	- numpixels - the number of pixels that the sprite will move per clock frame.
+	
+So let's implement our AutoSprite class. Create a new file called AutoSprite.js in the scripts sub-directory. 
+
+We declare our class function and add the new parameters at the beginning of the parameter list (this is a choice, we could have added them in any order).
+
+```javascript
+function AutoSprite(pixelsPerFrame, spriteDirection, spriteMap, left, top, w, h, fr, frames, frameDir, doOnce) {
+}
+```
+
+The first thing that we want to do is to call the Sprite class function to do the necessary initialisation there. We have a special syntax for doing this which applies the initialisation code to the implicit ```this``` object which is created on calling the AutoSprite function.
+
+```javascript
+    Sprite.call(this,spriteMap,left,top,w,h,fr,frames,frameDir,doOnce);
+```
+
+Note how we pass the parameters to the Sprite function from those declare to the AutoSprite function.
+
+We set some defaults for the ```pixelsPerFrame``` and the ```spriteDirection``` parameters:
+
+```javascript
+    var pxPerFrame = pixelsPerFrame || 3;       // Number of pixels to move the sprite each frame
+    var moveDirection = spriteDirection || "horizontal";    // Is sprite moving horizontally or vertically.
+```
+
+Now this is the other clever bit. We want to reposition the sprite before then allowing the standard ```Sprite.update``` to be called. We do this by taking a copy of the update function that was created by the ```Sprite``` function and then over-writing this method with our own version.
+
+```javascript
+    var spriteUpdate = this.update;
+
+    this.update = function(framesElapsed) {
+        var curPos = this.getPosition();
+        // Now we calculate the new position of the sprite
+        // If we're moving horizontally, then we will modify the left position and if moving vertically we'll
+        // modify the top position
+        if ( moveDirection === "horizontal") {
+            curPos.left += pxPerFrame*framesElapsed;
+        } else {
+            curPos.top += pxPerFrame*framesElapsed;
+        }
+
+        this.setPosition(curPos.top, curPos.left);
+        spriteUpdate(framesElapsed);
+    }
+```
+
+Note that the last line of our new ```update``` function calls the function that we took a copy of earlier. So that's it - we've intercepted the update function call, done our bit of code to customise the behaviour, and then called the original update function as usual.
+
+Now we just need to load this javascript in the html file. So add the following tags there:
+
+```html
+		<script src="scripts/AutoSprite.js" type="text/javascript"></script>
+```
+
+And now we modify our gunship.js function to use the new automated sprite as follows. Modify the line that creates the existing sprite to look like this:
+
+```javascript
+		sprite = new AutoSprite(-1.66,'horizontal',imageCache.get('images/sprites.png'),78,0,80,39,10,[0,1,2,3,2,1],'horizontal');
+```
+
+And let's position it in the middle of our canvas so that we can see the effect better.
+
+```javascript
+		sprite.setPosition(300,500);
+```
