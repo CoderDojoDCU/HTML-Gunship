@@ -745,7 +745,7 @@ And then finally we schedule this function to be called again on the next tick.
 		animationId = requestAnimationFrame(clockTick);
 ```
 
-With our GameClock class complete now we just need to include it in our set of loaded scripts. So add the following <script> tags to your gunship.html file:
+With our GameClock class complete now we just need to include it in our set of loaded scripts. So add the following &lt;script&gt; tags to your gunship.html file:
 
 ``` html
 		<script src="scripts/GameClock.js" type="text/javascript"></script>
