@@ -843,3 +843,78 @@ And let's position it in the middle of our canvas so that we can see the effect 
 ```javascript
 		sprite.setPosition(300,500);
 ```
+
+### Starting to put it all together
+To date we've tended to use ```gunship.js``` to test the various other classes that we've been working on. Now though we want to start putting all of these classes together to build our application. 
+
+At the outset we identified that one of the classes we were going to require to build our game is the GameEngine or the Game AI. This class is going to drive the game and implement the logic that controls all aspects of the game. 
+
+So to get started we're going to do a little bit of re-organisation of some of the code in ```gunship.js```. We're going to create a new class called ```GameEngine``` and move our sample automated sprite into that to verify that it's working correctly.
+
+Our GameEngine really only has one function and that is to start the game. We implement a method on GameEngine called ```init``` to do this. So we can re-arrange gunship.js to look like this: (Note the amount of code we've removed from this file).
+
+```javascript
+	$(document).ready(function() {
+		var gameCanvas = $("#gameCanvas")[0];
+		var imageCache = new ImageCache();
+
+		var gameEngine;
+		imageCache.ready(function() {
+			gameEngine = new GameEngine(gameCanvas, imageCache);
+			gameEngine.init();
+		});
+		imageCache.load(['images/terrain.png','images/gunship.png', 'images/sprites.png']);
+	});
+```
+
+We create the GameEngine passing it in a reference to the canvas that we're going to use for the game and also a reference to the cache of images that it has loaded. Then we call the GameEngine's ```init``` method which starts the game.
+
+So what does GameEngine look like. Let's create ```GameEngine.js``` (don't forget that this has to be saved to our scripts directory along with the other JavaScript files).
+
+```javascript
+	function GameEngine(gameCanvas, imageCache) {
+		var theCanvas = gameCanvas;
+		var theImages = imageCache;
+		
+		var drawCtx = theCanvas.getContext("2d");
+		
+		var gameClock = new GameClock();
+		var pattern = drawCtx.createPattern(imageCache.get('images/terrain.png'),"repeat");
+		drawCtx.fillStyle = pattern;
+		
+	}
+```
+
+This is just the functionality that we've moved to ```GameEngine.js``` from ```Gunship.js```. We also need to add a reference to a sprite object (just to check that we haven't broken anything) and implement our ```init``` function.
+
+```javascript
+	var sprite = null;
+
+	this.init = function() {
+		sprite = createEnemySprite();
+		sprite.setPosition(300,500);
+		gameClock.registerStep(function(framesElapsed,curFrameNo) {
+			drawCtx.fillRect(0,0,theCanvas.width, theCanvas.height);
+			sprite.update(framesElapsed);
+			sprite.render(drawCtx);
+		});
+		gameClock.start();
+	}
+	
+	function createEnemySprite() {
+		var s = new AutoSprite(-1.66,'horizontal',imageCache.get('images/sprites.png'),78,0,80,39,10,[0,1,2,3,2,1],'horizontal');
+		return s;
+	}
+```
+
+We've created a function ```createEnemySprite``` because we're going to need a function like this as we develop our game so we might as well create it now.
+
+So all our GameEngine class does yet is create an enemy sprite, position it on the screen and then register a game step function with the game clock to make everything work.
+
+Finally we need to add a reference to our GameEngine class to our HTML file so that it get's included. So add the following script tag below the others in the HTML file.
+
+```html
+	<script src="scripts/GameEngine.js" type="text/javascript"></script>
+```
+
+Now our game should work as before - it simply creates an enemy sprite on the screen that travels to the left and off screen.
