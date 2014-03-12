@@ -918,5 +918,3 @@ Finally we need to add a reference to our GameEngine class to our HTML file so t
 ```
 
 Now our game should work as before - it simply creates an enemy sprite on the screen that travels to the left and off screen.
-
-<script>alert('Hellow World')</script>
