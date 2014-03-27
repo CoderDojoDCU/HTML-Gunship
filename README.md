@@ -751,7 +751,7 @@ With our GameClock class complete now we just need to include it in our set of l
 		<script src="scripts/GameClock.js" type="text/javascript"></script>
 ```
 
-### Automating Sprites
+## Automating Sprites
 
 Our game has two kinds of sprites - we have the player which moves in response to the keys on the keyboard.
 
@@ -844,7 +844,7 @@ And let's position it in the middle of our canvas so that we can see the effect 
 		sprite.setPosition(300,500);
 ```
 
-### Starting to put it all together
+## Starting to put it all together
 To date we've tended to use ```gunship.js``` to test the various other classes that we've been working on. Now though we want to start putting all of these classes together to build our application. 
 
 At the outset we identified that one of the classes we were going to require to build our game is the GameEngine or the Game AI. This class is going to drive the game and implement the logic that controls all aspects of the game. 
@@ -918,3 +918,170 @@ Finally we need to add a reference to our GameEngine class to our HTML file so t
 ```
 
 Now our game should work as before - it simply creates an enemy sprite on the screen that travels to the left and off screen.
+
+
+### Adding the Player Sprite
+
+So now that we've proven that our little re-organisation hasn't broken anything let's start to introduce some elements of our game. The easiest place to start is by introducing the player sprite and adding keyboard handling to control it.
+
+First let's place the enemy sprite we have already with the player sprite and position it in middle at the left hand edge of the screen. We create a function ```createPlayerSprite``` to create the sprite and position it. So add the following function to ```GameEngine.js```:
+
+```javascript
+	function createPlayerSprite() {
+		var s = new Sprite(imageCache.get('images/sprites.png'),0,0,39,39,10,[0,1]);
+		var top = Math.floor((canvasHeight - 39)/2);
+		s.setPosition(top,0);
+		return s;
+	}
+```
+
+Here we just use the Sprite object (since we're going to be moving this sprite around using the keyboard). Notice that since we earlier added default parameters to the Sprite object for ```frameDir``` and ```doOnce``` we don't need to specify those last two parameters to the Sprite object function. If not specified default values of 'horizontal' and 'false' are assumed for these two parameters.
+
+Since we're going to position this sprite at the left hand side of our canvas we know that the left position is going to be 0 (zero). Therefore we only need to calculate the vertical (top) position of the sprite. To position the sprite correctly in the middle of the vertical we need adjust for the height of the sprite itself so it's not quite as simple as dividing the height of the canvas in two. We capture the ```canvasHeight``` and ```canvasWidth``` by adding some more ```var``` statments when the GameEngine object is constructed as follows:
+
+```javascript
+	var canvasHeight = theCanvas.clientHeight,
+		canvasWidth  = theCanvas.clientWidth;
+```
+
+We know that our player sprite is 39 pixels square so we can calculate the top position of our sprite using
+```
+	(canvasHeight - 39)/2
+```
+
+However in order to ensure that the returned value is an integer (it could be a value like 305.75!!) we surround the calculation with a call to ```Math.floor``` which returns the whole number part of a value (no rounding).
+
+Then we use this calculation to position the sprite by calling:
+```javascript
+	s.setPosition(top,0);
+```
+
+Finally, in GameEngine.js change
+```javascript
+	var sprite = null;
+```
+
+to 
+
+```javascript
+	var playerSprite = createPlayerSprite();
+```
+
+and change the two lines:
+```javascript
+	sprite.update(framesElapsed);
+	sprite.render(drawCtx);
+```
+
+to 
+
+```javascript
+	playerSprite.update(framesElapsed);
+	playerSprite.render(drawCtx);
+```
+
+(We're replacing the var we used earlier to test our re-organisation since this was only a temporary measure.)
+
+Save GameEngine.js and open the game in the browser. You should see the gunship sitting in the middle of the left-hand side of the game canvas.
+
+### Keyboard Handling
+
+Now let's add our keyboard handling. 
+
+In order to make the keyboard handling more responsive we're going to monitor key-up and key-down events to track which keys are pressed and we respond based on the current status of those keys. This allows us to keep moving the sprite as long as the key remains pressed rather than depending on the keyboard repeat rate which usually has a delay before the first repeat.
+
+We're going to use a key status map object to keep track of the keys that are pressed. In ```GameEngine.js``` we create this object and add a function that we can use to update it for us as follows:
+
+```javascript
+	var keyStatusMap = {};
+	
+	function setKeyStatus(keyEvent, status) {
+		switch( keyEvent.keyCode ) {
+			case 32:  // Space key
+				keyStatusMap["SPACE"] = status;
+				break;
+			case 37:  // Left key
+				keyStatusMap["LEFT"] = status;
+				break;
+			case 38: // Up key
+				keyStatusMap["UP"] = status;
+				break;
+			case 39: // Right key
+				keyStatusMap["RIGHT"] = status;
+				break;
+			case 40: // DOWN key
+				keyStatusMap["DOWN"] = status;
+				break;
+		}
+	}
+```
+
+This function is passed a reference to the key event and the status to be assigned to the key pressed. This function only looks at the UP, DOWN, LEFT, and RIGHT arrow keys for the moment and then creates a member of the JSON object ```keyStatusMap``` using the friendly name for the key and updates it with the status passed in.
+
+We use this functionality by attaching keyboard handlers to the document in which the game is executing. We use the keyDown handler to set the status of the key to 'true' to indicate that the key is pressed, and then the keyUp handler to set the status of the key to 'false'. This is accomplished by adding the following code to the GameEngine's ```init``` method:
+
+```javascript
+	$(document).keydown(function(keyEvent) {
+		setKeyStatus(keyEvent,true);
+	});
+	
+	$(document).keyup(function(keyEvent) {
+		setKeyStatus(keyEvent,false);
+	});
+```
+
+Now we have an object which reflects the current status of the keys in which we're interested. We write a function to check this object and use it to reposition the playerSprite as appropriate.
+
+```javascript
+	function checkPlayerActions(framesElapsed) {
+		var currentPlayerPos = playerSprite.getPosition();
+		if ( keyStatusMap["LEFT"] ) {
+			playerSprite.setPosition(currentPlayerPos.top,
+				Math.max(0,
+					currentPlayerPos.left-(MOVE_PIXELS*framesElapsed)));
+		}
+		if ( keyStatusMap["RIGHT"] ) {
+			playerSprite.setPosition(currentPlayerPos.top,
+				Math.min(
+					canvasWidth-playerWidth,
+					currentPlayerPos.left+(MOVE_PIXELS*framesElapsed)));
+		}
+		if ( keyStatusMap["UP"] ) {
+			playerSprite.setPosition(
+				Math.max(0,currentPlayerPos.top-(MOVE_PIXELS*framesElapsed)),
+				currentPlayerPos.left);
+		}
+		if ( keyStatusMap["DOWN"] ) {
+			playerSprite.setPosition(
+				Math.min(canvasHeight-playerHeight,
+					currentPlayerPos.top+(MOVE_PIXELS*framesElapsed)),
+				currentPlayerPos.left);
+		}
+	}
+```
+
+This method checks each of the keys of interest in the ```keyStatusMap``` object and if the status of that key is indicated as being pressed, we then calculate the new position of the playerSprite and set it as appropriate.
+
+For the LEFT and RIGHT keys we simply calculate a new ```top``` position for the player sprite and set this position on the playerSprite object. For the UP and DOWN keys we only change the ```left``` position of the object.
+
+You will notice that the LEFT and UP keyboard processing uses ```Math.max``` when calculating the left and top positions. The purpose of this is to ensure that when moving the sprite LEFT or UP we don't allow the sprite to move off the canvas in that direction which would happen if the relevant parameter was 
+allowed to become negative.
+
+A similar ploy is used to stop the sprite going off the right or bottom of the canvas when the RIGHT and DOWN keys are pressed. In this instance we use ```Math.min``` to limit the position to the maximum position that the sprite can have on the right or bottom of the canvas. To calculate the maximum left position of the sprite we subtract the width of the sprite from the width of the canvas and using Math.min we stop the calculated value exceeding this. We do the same when calculating a new top position on detecting the DOWN key except we calculate the maximum value for top by subtracting the height of the sprite from the canvas height.
+
+You will also notice that we use a constant ```MOVE_PIXELS``` to calculate the number of pixels to move the sprite each time the key status is checked. We set this to a value of 3 pixels. We put the following line towards the top of the GameEngine.js file (immediately after the declaration of canvasWidth and canvasHeight):
+
+```javascript
+	var MOVE_PIXELS=3;
+```
+
+Also you will notice that we use the number of elapsed frames as a multiplier to calculate the distance to move each time. Hence we need to pass this value into the ```checkPlayerActions``` function. 
+
+Finally we need to call this function from the game step function. So we add the following call as the first line of the the gamestep function:
+
+```javascript
+	checkPlayerActions(framesElapsed);
+```
+
+That's it. We should now be able to move the playerSprite around the game canvas and we shouldn't be able to move it off the canvas in any direction.
+
