@@ -55,6 +55,14 @@ function Sprite(spriteMap, top, left, width, height, fr, frames, frameDir, doOnc
 	};
 	
 	this.render = function(drawCtx) {
+		// We check here to see if the sprite is still visible before we 
+		// go to the trouble of rendering it.
+		// The below statement is equivaluent to
+		// done = done || (curSpritePos.left ... );
+		done |= curSpritePos.left < -size.w || 
+				curSpritePos.left > drawCtx.canvas.width ||
+				curSpritePos.top < -size.h ||
+				curSpritePos.top > drawCtx.canvas.height;
 		// If we're done we don't need to do anything
 		if ( !done ) {
 			// Get the frameNo from the frameSet array

@@ -1085,3 +1085,142 @@ Finally we need to call this function from the game step function. So we add the
 
 That's it. We should now be able to move the playerSprite around the game canvas and we shouldn't be able to move it off the canvas in any direction.
 
+As we move our sprite around the screen now with the arrow keys you will notice that it stops before running off the screen. However you will notice that while moving from left to right, the sprite goes right up to the vertical edges, when moving up and down there is a gap between the sprite and the edge. 
+
+This gap is down to the height we defined for the sprite in ```createPlayerSprite()```. Currently the sprite is a square 39px X 39px image. However if you examine the height of the sprite in the sprite map you will notice that the actual image starts 5px from the top and the bottom of the image is actually 30px from the top. So we could change the sprite definition to start 5px further down and to only have a height of 25px (30px bottom - 5px top) as follows:
+```javascript
+	function createPlayerSprite() {
+		var s = new Sprite(imageCache.get('images/sprites.png'),5,0,39,25,10,[0,1]);
+		var top = Math.floor((canvasHeight - 39)/2);
+		s.setPosition(top,0);
+		return s;
+	}
+```
+(Note the updated 2nd and 5th parameters to the Sprite constructor.)
+
+Now when we move up the sprite goes right to the top edge of our canvas, however moving down still leaves a gap. Debugging the down arrow action in ```checkPlayerActions()``` reveals that the calculation at the following line is incorrect.
+```javascript
+	Math.min(canvasHeight-playerHeight,
+		currentPlayerPos.top+(MOVE_PIXELS*framesElapsed)),
+		currentPlayerPos.left)
+```
+
+On examination we see that the value of playerHeight is still 39!! How did that happen. Let's look back to where this value is set.
+```javascript
+	var canvasHeight = theCanvas.clientHeight,
+		canvasWidth  = theCanvas.clientWidth;
+		
+	var MOVE_PIXELS = 3;
+	var playerWidth = 39;
+	var playerHeight = 39;
+```
+There's the problem - we've hardcoded the size of the sprite. 
+
+
+Why don't we interrogate the sprite after it's created and use that to get the values for these variables (which we're really only using for convenience). So we move the two lines relating to ```playerWidth``` and ```playerHeight``` above to below where the playerSprite is created and change them as follows:
+```javascript
+	var playerSprite = createPlayerSprite();
+	// Interrogate the playersprite to find out it's width and height.
+	var playerWidth = playerSprite.getSize().w;
+	var playerHeight = playerSprite.getSize().h;
+```
+
+Now you'll find that the sprite moves right to the bottom of the screen correctly.
+
+### Introducing ... The Enemy
+Our game is going to generate a stream of enemies for us to fight. These enemies are introduced randomly. Also, we need to manage many enemies as they are created, update them on screen and remove them when they are killed or go off-screen.
+
+First let's create somewhere to store references to all of the enemies that we create. An array seems like an ideal way to do this. So we add an array for enemies just under where we declared the playerSprite in ```GameEngine.js```
+
+```javascript
+	var playerSprite = createPlayerSprite();
+	// Interrogate the playersprite to find out it's width and height.
+	var playerWidth = playerSprite.getSize().w;
+	var playerHeight = playerSprite.getSize().h;
+	
+    // Many enemies - so use an array to store references to them
+    var enemies = [];
+```
+
+And for the moment we'll make life easy on ourselves by just putting a single enemy into the array. So let's add an enemy to the array in the init function (i.e. just before registering the gamestep.
+
+```javascript
+	this.init = function() {
+		$(document).keydown(function(keyEvent) {
+			setKeyStatus(keyEvent,true);
+		});
+		
+		$(document).keyup(function(keyEvent) {
+			setKeyStatus(keyEvent,false);
+		});
+	
+		enemies.push(createEnemySprite());
+		gameClock.registerStep(function(framesElapsed,curFrameNo) {
+```
+Next we need to display any enemy sprites whenever we're drawing the current game state. So when we modify the step registered in the gameClock to include rendering of the sprites in the enemy array.
+```javascript
+		gameClock.registerStep(function(framesElapsed,curFrameNo) {
+			checkPlayerActions(framesElapsed);
+			drawCtx.fillRect(0,0,theCanvas.width, theCanvas.height);
+			playerSprite.update(framesElapsed);
+			playerSprite.render(drawCtx);
+			var ix = 0;
+			enemies.forEach(function(s) {
+				s.update(framesElapsed);
+				s.render(drawCtx);
+			});
+		});
+```
+This will render the enemy on the canvas and it will move to the left off the screen. 
+
+But wait a minute! All new enemy sprites should be position just on the right hand side of our game canvas and in some random vertical position. So let's update our ```createEnemySprite``` function to position the sprite randomly vertically and just on the right handside of the screen. So the sprite returned by ```createEnemySprite``` is already appropriately positioned.
+
+```javascript
+	function createEnemySprite() {
+		var s = new AutoSprite(-1.66,'horizontal',imageCache.get('images/sprites.png'),78,0,80,39,10,[0,1,2,3,2,1],'horizontal');
+		var left = canvasWidth - 5;   // Left most part of sprite is 5px from RHS
+		var top = Math.min(Math.random()*canvasHeight, 
+								canvasHeight - s.getSize().h);
+		s.setPosition(top,left);
+		return s;
+	}
+```
+
+Above we've calculated the left position of the enemy sprite (just 5px from the RHS of the canvas) and the top position (some random location that will fit on the canvas. We use Math.min to make sure that the sprite will always completely fit on the screen.
+
+Now if we reload the page for our project we will see an enemy sprite appear on the very right hand side of the canvas and each time we reload the page it's initial vertical position will change randomly.
+
+### Tracking active sprites
+The enemy sprite will eventually move off the left side of the canvas. However just because it's no longer visible doesn't mean that it's not still part of our game. In fact if you were to debug the web-page you would see that the sprite is positioned further and further to the left with an increasing negative 'left' position.
+
+As we add sprites to our game we will have more and more of these objects to manage. Each of these consumes memory and processor time to manage. Therefore it makes sense to get rid of the sprites that are no longer on screen. Let's look at how we do that.
+
+You may remember that we introduced a 'done' variable in the sprite class specifically to work with single play sprites (i.e. like explosions - they are no longer rendered once they have rendered all of their frames). Let's look at using this variable to flag when a sprite is no longer visible on the screen.
+
+We can use the ```render()``` method of the sprite class to detect when the sprite is no longer visible on the screen. This is convenient because this method is passed a reference to the drawing context which allows us to access the canvas dimensions and hence we can make the detection of sprites no longer being visible "automatic".
+
+So we look for the left side of the sprite less than the negative width of the sprite ('cos then it's completely off the left of the canvas) or the left of the sprite greater than the canvas width. A similar evaluation can be applied to the top position relative to the top and bottom of the canvas.
+
+We can express this using the following statement. Put this at the beginning of the ```render()``` method.
+```javascript
+	this.render = function(drawCtx) {
+		// We check here to see if the sprite is still visible before we 
+		// go to the trouble of rendering it.
+		// The below statement is equivaluent to
+		//    done = done || (curSpritePos.left ... );
+		// Or 
+		//    if ( !done) {
+		//		done = ...
+		//	  } else {
+		//		done = done;
+		//    }
+		done |= curSpritePos.left < -size.w || 
+				curSpritePos.left > drawCtx.canvas.width ||
+				curSpritePos.top < -size.h ||
+				curSpritePos.top > drawCtx.canvas.height;
+```
+Note the use of the ```|=``` operator which provides a more convenient method of evaluating our conditions and assigning the result to the ```done``` variable.
+
+Now when our sprite is no longer visible on screen it will flag itself as done and the gameengine can check this using the ```isDone()``` method of the sprite.
+
+Now let's look at removing inactive sprites from the enemy list of the gameengine.
