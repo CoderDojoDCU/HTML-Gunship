@@ -7,6 +7,7 @@ function GameEngine(gameCanvas, imageCache) {
 		canvasWidth  = theCanvas.clientWidth;
 		
 	var MOVE_PIXELS = 3;
+	var BULLET_SPEED = 5;
 	// Get the drawing context that we're going to use to draw on our game surface.
 	var drawCtx = theCanvas.getContext("2d");
 	
@@ -20,6 +21,9 @@ function GameEngine(gameCanvas, imageCache) {
 	
 	// We're going to have a lot of enemy sprites so array
 	var enemies = [];
+	// Just like the enemies, we can have a lot of bullets on screen.
+	// Manage these here.
+	var bullets = [];
 	
 	// We only need to create the pattern once so do it when we initialise the game engine.
 	var pattern = drawCtx.createPattern(imageCache.get('images/terrain.png'),"repeat");
@@ -66,15 +70,30 @@ function GameEngine(gameCanvas, imageCache) {
 			var ix = 0;
 			// Turn forEach statment below into code for the below loop so that we can 
 			// remove completed sprites from the array as we process it.
-			for(ix = 0; ix < enemies.length; ix++ ) {
-				
+			renderSprites(enemies, framesElapsed);
+			if ( bullets.length > 0 ) {
+				renderSprites(bullets, framesElapsed);
 			}
-			enemies.forEach(function(s) {
-				s.update(framesElapsed);
-				s.render(drawCtx);
-			});
 		});
 		gameClock.start();
+	}
+	
+	// For each set of sprites that we need to render we 
+	function renderSprites(spriteArray, framesElapsed) {
+		for( var ix = 0; ix < spriteArray.length; ix++ ) {
+			var s = spriteArray[ix];
+			s.update(framesElapsed);
+			s.render(drawCtx);
+			// Now we test to see if the sprite is still visible and if not
+			// we remove from the array so we no longer have to manage it.
+			if ( s.isDone() ) {
+				// Note post-decrement of ix - returns the current value of ix to the 
+				// splice method call and then decrements ix
+				spriteArray.splice(ix--,1);	
+				// If we didn't decrement ix, then it would skip evaluation of the next 
+				// element of the sprites array.
+			}
+		}
 	}
 	
 	function checkPlayerActions(framesElapsed) {
@@ -101,10 +120,15 @@ function GameEngine(gameCanvas, imageCache) {
 					currentPlayerPos.top+(MOVE_PIXELS*framesElapsed)),
 				currentPlayerPos.left);
 		}
+		
+		if ( keyStatusMap["SPACE"] ) {
+			// Create the bullet sprites.
+			bullets = bullets.concat(createBulletSprites());
+		}
 	}
 	
 	function createEnemySprite() {
-		var s = new AutoSprite(-1.66,'horizontal',imageCache.get('images/sprites.png'),78,0,80,39,10,[0,1,2,3,2,1],'horizontal');
+		var s = new AutoSprite(-1.66,'horizontal',imageCache.get('images/sprites.png'),0,78,80,39,10,[0,1,2,3,2,1],'horizontal');
 		var left = canvasWidth - 5;   // Left most part of sprite is 5px from RHS
 		var top = Math.min(Math.random()*canvasHeight, 
 								canvasHeight - s.getSize().h);
@@ -117,5 +141,18 @@ function GameEngine(gameCanvas, imageCache) {
 		var top = Math.floor((canvasHeight - 39)/2);
 		s.setPosition(top,0);
 		return s;
+	}
+	
+	function createBulletSprites() {
+		var spos = playerSprite.getPosition();
+		var ssize = playerSprite.getSize();
+		
+		var forward = new AutoSprite(BULLET_SPEED, 'horizontal', imageCache.get('images/sprites.png'),0,39,17,7,0,[0],null,false);
+		forward.setPosition( spos.top + (ssize.h/2) - (forward.getSize().h/2),
+							 spos.left + ssize.w);
+		var down = new AutoSprite(BULLET_SPEED,'vertical',imageCache.get('images/sprites.png'),0,50,9,5,0,[0],null,false);
+		var up = new AutoSprite(BULLET_SPEED,'vertical',imageCache.get('images/sprites.png'),0,60,9,5,0,[0],null,false);
+		
+		return [forward,up,down];
 	}
 }

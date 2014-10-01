@@ -1224,3 +1224,205 @@ Note the use of the ```|=``` operator which provides a more convenient method of
 Now when our sprite is no longer visible on screen it will flag itself as done and the gameengine can check this using the ```isDone()``` method of the sprite.
 
 Now let's look at removing inactive sprites from the enemy list of the gameengine.
+
+Currently we use an array.forEach() method to step through the list of enemy sprites and call the ```update()``` and ```render()``` methods on each one. However this method of stepping through the list of enemies doesn't allow us to modify the array of enemies. So we need to change the way we step through this array.
+
+Another way to step through the array is to use a ```for()``` loop. This allows us to step through the list of enemies and reference each one by it's position in the array. So we convert the following code:
+```javascript
+	enemies.forEach(function(s){
+		s.update(framesElapsed);
+		s.render(drawCtx);
+	});
+```
+
+to look like this:
+
+```javascript
+	var ix;
+	for(ix = 0; ix < enemies.length; ix++) {
+		var s = enemies[ix];
+		s.update(framesElapsed);
+		s.render(drawCtx);
+	}
+```
+
+Now we can use the sprites ```isDone()``` method to check if the sprite is completed and if so we can remove it from the array using the ```array.splice()``` method.
+```javascript
+	for(ix = 0; ix < enemies.length; ix++) {
+		var s = enemies[ix];
+		s.update(framesElapsed);
+		s.render(drawCtx);
+		if ( s.isDone() ) {
+			enemies.splice(ix,1);
+		}
+	}
+```	
+
+This looks correct ( and if you run it and check the enemies array you will see that it empties when the sprite goes off-screen), however as you examine it you will see that it has a slight flaw. 
+
+Say we have an array of 6 items as follows: A B C D E F - where A is index 0, B is index 1, etc.
+If we remove the element at index 2 (i.e. element C) our array now looks like: A B D E F.
+So now the element that was previously at index 3 is now at index 2.
+
+In our loop - the index value is 2 when the element is removed. The value of index variable, ```ix``` is then incremented so it now has a value of 3. But element 3 is now 'E' which means we never processed element D. The solution is to decrement the index variable when an element is removed from the array. We can do this as follows:
+```javascript
+		if ( s.isDone() ) {
+			enemies.splice(ix,1);
+			ix--;
+		}
+```
+Alternatively we can so this in-place as part of the call to ```Array.splice()``` by taking advantage of the fact that this is called __post__ decrement. This means that the current value of the variable is returned before the value is decremented. The following snippet should clarify:
+```javascript
+	var c = 2;		// C is initialised with a value of 2
+	var y = c--;	// y is initialised with a value of 2, but c will have a value of 1 afterwards.
+```
+
+So we can rewrite this statement as
+```javascript
+		if ( s.isDone() ) {
+			enemies.splice(ix--,1);
+		}
+```
+
+### Let's shoot some bullets
+As our game progresses we will introduce bullets each time the user presses the space bar. However each time the space bar is pressed we want to create three bullets - one going forward, one going up and another going down. So we're actually going to generate an array of three bullets each time the space bar is pressed.
+
+Let's generate the bullets first. Each bullet is an AutoSprite. So lets create the AutoSprites first. Let's add a new function called ```createBullets()```:
+```javascript
+	function createBulletSprites() {
+		var forward = new AutoSprite(BULLET_SPEED, 'horizontal', imageCache.get('images/sprites.png'),0,39,17,7,0,[0],null,false);
+		var down = new AutoSprite(BULLET_SPEED,'vertical',imageCache.get('images/sprites.png'),0,50,9,5,0,[0],null,false);
+		var up = new AutoSprite(BULLET_SPEED,'vertical',imageCache.get('images/sprites.png'),0,60,9,5,0,[0],null,false);
+		
+		return [forward,up,down];
+	}
+```
+
+This creates three bullets and returns them in an array. However these bullets are not positioned. We need to position these around the player sprite. Let's position the forward bullet first. First we capture the position and size of the player sprite as we will use these to calculate where to position the bullets.
+```javascript
+	function createBulletSprites() {
+		var spos = playerSprite.getPosition();
+		var ssize = playerSprite.getSize();
+		
+		var forward = new AutoSprite(BULLET_SPEED, 'horizontal', imageCache.get('images/sprites.png'),0,39,17,7,0,[0],null,false);
+		// Position the bullet in front of the player sprite and put the middle of the bullet in the middle of the sprite.
+		forward.setPosition( spos.top + (ssize.h/2) - (forward.getSize().h/2),
+							 spos.left + ssize.w);
+		var down = new AutoSprite(BULLET_SPEED,'vertical',imageCache.get('images/sprites.png'),0,50,9,5,0,[0],null,false);
+		var up = new AutoSprite(BULLET_SPEED,'vertical',imageCache.get('images/sprites.png'),0,60,9,5,0,[0],null,false);
+		
+		return [forward,up,down];
+	}
+```
+
+As our game progresses we will have a number of bullets in flight at any given time. So we use an array to manage our bullets just like we did with our enemies.
+```javascript
+	// We're going to have a lot of enemy sprites so array
+	var enemies = [];
+	// Just like the enemies, we can have a lot of bullets on screen.
+	// Manage these here.
+	var bullets = [];
+```
+
+And now we add a line to ```checkPlayerActions()``` to generate the bullets when the space bar is pressed.
+```javascript
+		if ( keyStatusMap["SPACE"] ) {
+			// Create the bullet sprites.
+			bullets = bullets.concat(createBulletSprites());
+		}
+```
+
+Since our function creates an array of bullets we can use the concat method to create a new array with the contents of the existing array and the newly created bullet array.
+
+Now in our game engine we can repeat the functionality that we did with the enemies to render the bullets. Anytime we end up duplicating code it should prompt us to look at creating a function to do this so that we don't end up writing effectively the same code twice.
+
+So we create a new function called ```renderSprites()``` directly below the ```init()``` function as follows:
+```javascript
+	function renderSprites(spriteArray, framesElapsed) {
+		for( var ix = 0; ix < spriteArray.length; ix++ ) {
+			var s = spriteArray[ix];
+			s.update(framesElapsed);
+			s.render(drawCtx);
+			// Now we test to see if the sprite is still visible and if not
+			// we remove from the array so we no longer have to manage it.
+			if ( s.isDone() ) {
+				// Note post-decrement of ix - returns the current value of ix to the 
+				// splice method call and then decrements ix
+				spriteArray.splice(ix--,1);	
+				// If we didn't decrement ix, then it would skip evaluation of the next 
+				// element of the sprites array.
+			}
+		}
+	}
+```
+
+(Note: we had to pass framesElapsed into this method also).
+
+Then we can replace the corresponding code in the ```init``` function with a single line:
+```javascript
+			renderSprites(enemies, framesElapsed);
+```
+
+Finally we can now do the same for our bullets array. Out init function should now look like this:
+```javascript
+	this.init = function() {
+		$(document).keydown(function(keyEvent) {
+			setKeyStatus(keyEvent,true);
+		});
+		
+		$(document).keyup(function(keyEvent) {
+			setKeyStatus(keyEvent,false);
+		});
+	
+		enemies.push(createEnemySprite());
+		gameClock.registerStep(function(framesElapsed,curFrameNo) {
+			checkPlayerActions(framesElapsed);
+			drawCtx.fillRect(0,0,theCanvas.width, theCanvas.height);
+			playerSprite.update(framesElapsed);
+			playerSprite.render(drawCtx);
+			// Render the sprites that are stored in arrays.
+			renderSprites(enemies, framesElapsed);
+			renderSprites(bullets, framesElapsed);
+		});
+		gameClock.start();
+	}
+```
+
+Now if you run the game and press the space bar it should three bullets - only one of which is as yet positioned correctly. When I did this I noticed that the forward bullet wasn't rendered properly. What's going on?
+
+Here I have a confession to make :(. 
+
+When we (I?) defined the ```AutoSprite``` object we mis-matched it's constructor with that of the ```Sprite``` object that it uses. Currently the ```AutoSprite``` is defined as follows:
+```javascript
+	function AutoSprite(pixelsPerFrame, spriteDirection, spriteMap, left, top, w, h, fr, frames, frameDir, doOnce) {
+		Sprite.call(this,spriteMap,left,top,w,h,fr,frames,frameDir,doOnce);
+		...
+	}
+```
+
+If we look at the ```Sprite``` constructor we see that it is defined as follows:
+```javascript
+	function Sprite(spriteMap, top, left, width, height, fr, frames, frameDir, doOnce ) {
+```
+
+Note how we are passing the parameter called __left__ from the ```AutoSprite``` constructor to the parameter called __top__ in the ```Sprite``` constructor. Similarly the __top__ parameter is passed to the ```Sprite``` as __left__. This means that the sprite definition is incorrect. To fix this we swap the order of the declared parameters in ```AutoSprite``` so that it matches the order declared in ```Sprite```. This means that it's now consistent between the two similar object definitions.
+
+So the ```AutoSprite``` declaration now looks like this:
+```javascript
+	function AutoSprite(pixelsPerFrame, spriteDirection, spriteMap, top, left, w, h, fr, frames, frameDir, doOnce) {
+		Sprite.call(this,spriteMap,left,top,w,h,fr,frames,frameDir,doOnce);
+		...
+	}
+```
+
+Now we also have to change the declaration of the parameters to the AutoSprite created in ```createEnemy``` as follows:
+```javascript
+	function createEnemySprite() {
+		var s = new AutoSprite(-1.66,'horizontal',imageCache.get('images/sprites.png'),0,78,80,39,10,[0,1,2,3,2,1],'horizontal');
+		...
+	}
+```
+
+Note: We have swapped the 4th and 5th parameters to the object definition.
+
+If you re-run the game now and hit the space bar the forward bullet is rendered correctly.

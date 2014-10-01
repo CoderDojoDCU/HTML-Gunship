@@ -1,7 +1,7 @@
 /**
  * This class sub-classes our existing sprite class. It adds the capability for the sprite to automatically move on the canvas
  */
-function AutoSprite(pixelsPerFrame, spriteDirection, spriteMap, left, top, w, h, fr, frames, frameDir, doOnce) {
+function AutoSprite(pixelsPerFrame, spriteDirection, spriteMap, top, left, w, h, fr, frames, frameDir, doOnce) {
     Sprite.call(this,spriteMap,left,top,w,h,fr,frames,frameDir,doOnce);
 
     // The sign of pixelsPerFrame affects the direction e.g. horizontal direction with a positive pixelsPerFrame

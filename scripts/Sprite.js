@@ -59,6 +59,12 @@ function Sprite(spriteMap, top, left, width, height, fr, frames, frameDir, doOnc
 		// go to the trouble of rendering it.
 		// The below statement is equivaluent to
 		// done = done || (curSpritePos.left ... );
+		// Or 
+		//    if ( !done) {
+		//		done = ...
+		//	  } else {
+		//		done = done;
+		//    }
 		done |= curSpritePos.left < -size.w || 
 				curSpritePos.left > drawCtx.canvas.width ||
 				curSpritePos.top < -size.h ||
