@@ -128,7 +128,7 @@ function GameEngine(gameCanvas, imageCache) {
 	}
 	
 	function createEnemySprite() {
-		var s = new AutoSprite(-1.66,'horizontal',imageCache.get('images/sprites.png'),0,78,80,39,10,[0,1,2,3,2,1],'horizontal');
+		var s = new AutoSprite(-1.66,'horizontal',imageCache.get('images/sprites.png'),78,0,80,39,10,[0,1,2,3,2,1],'horizontal');
 		var left = canvasWidth - 5;   // Left most part of sprite is 5px from RHS
 		var top = Math.min(Math.random()*canvasHeight, 
 								canvasHeight - s.getSize().h);
@@ -147,11 +147,11 @@ function GameEngine(gameCanvas, imageCache) {
 		var spos = playerSprite.getPosition();
 		var ssize = playerSprite.getSize();
 		
-		var forward = new AutoSprite(BULLET_SPEED, 'horizontal', imageCache.get('images/sprites.png'),0,39,17,7,0,[0],null,false);
+		var forward = new AutoSprite(BULLET_SPEED, 'horizontal', imageCache.get('images/sprites.png'),39,0,17,7,0,[0],null,false);
 		forward.setPosition( spos.top + (ssize.h/2) - (forward.getSize().h/2),
 							 spos.left + ssize.w);
-		var down = new AutoSprite(BULLET_SPEED,'vertical',imageCache.get('images/sprites.png'),0,50,9,5,0,[0],null,false);
-		var up = new AutoSprite(BULLET_SPEED,'vertical',imageCache.get('images/sprites.png'),0,60,9,5,0,[0],null,false);
+		var down = new AutoSprite(BULLET_SPEED,'vertical',imageCache.get('images/sprites.png'),50,0,9,5,0,[0],null,false);
+		var up = new AutoSprite(BULLET_SPEED,'vertical',imageCache.get('images/sprites.png'),60,0,9,5,0,[0],null,false);
 		
 		return [forward,up,down];
 	}
