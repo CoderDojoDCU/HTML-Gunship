@@ -1426,3 +1426,150 @@ Now we also have to change the declaration of the parameters to the AutoSprite c
 Note: We have swapped the 4th and 5th parameters to the object definition.
 
 If you re-run the game now and hit the space bar the forward bullet is rendered correctly.
+
+Now let's position the up and down bullets. This just requires a little bit of maths. I also notice that our original definition of the up and down sprites were actually mis-defined - we were using the up bullet for the down sprite and vice versa.
+Revise the ```createBullets()``` function as follows to correct this and to position the sprites correctly:
+```javascript
+	function createBulletSprites() {
+		var spos = playerSprite.getPosition();
+		var ssize = playerSprite.getSize();
+		
+		var forward = new AutoSprite(BULLET_SPEED, 'horizontal', imageCache.get('images/sprites.png'),0,39,17,7,0,[0],null,false);
+		forward.setPosition( spos.top + (ssize.h/2) - (forward.getSize().h/2),
+							 spos.left + ssize.w);
+        var down = new AutoSprite(BULLET_SPEED,'vertical',imageCache.get('images/sprites.png'),0,60,9,5,0,[0],null,false);
+        down.setPosition(spos.top+ssize.h, spos.left + (ssize.w/2) - (down.getSize().w/2) );
+		var up = new AutoSprite(-BULLET_SPEED,'vertical',imageCache.get('images/sprites.png'),0,50,9,5,0,[0],null,false);
+        up.setPosition( spos.top, spos.left + (ssize.w/2) - (up.getSize().w/2) );
+
+		return [forward,up,down];
+	}
+```
+
+If we run this program now we see bullets flying everywhere. However one other little problem has come to light. For even the quickest press on the spacebar we seem to generate several bullets in each direction.
+This happens because the keyboard is scanned 60 times per second so even when you press the key quickly it will be detected on several scans and generate bullets for each one.
+We need to devise a way to delay the generation of the next sprite when an individual keypress is detected.
+
+We can add some code to the keyboard handling for the spacebar to address this. 
+
+### Limiting key repeat
+We can implement a generic mechanism for limit the number of times a key press is recognised per second by waiting for a specified period before generating the next keypress event.
+Every time a key is pressed that we want to implement a repeat delay on we can store the time at which is was last pressed and then not generate another keypress unless a minumum period has elapsed.
+A function to check for this might look something like the following:
+
+```javascript
+    function checkKeyHitDelay(keyName, delay) {
+    }
+```
+
+This function is going to check if the specified delay has elapsed since the last time the specified keyName was registered. We can add this to our code that generates bullets when the spacebar is pressed as follows:
+
+```javascript
+		if ( keyStatusMap["SPACE"] && checkKeyHitDelay("SPACE", KEY_REPEAT_DELAY)) {
+			// Create the bullet sprites.
+			bullets = bullets.concat(createBulletSprites());
+		}
+```
+
+As you can see it is easy to add this functionality to any keypress. So let's look at what it would take to implement this functionality.
+
+First we are going to need someplace to store the last time a specific key press was registered. So we create an object to record this just under the object that tracks the key press status:
+```javascript
+	var keyStatusMap = {};
+    var keyHitTime = {};
+```
+
+Now we use this to implement our keypress delay.
+```javascript
+    function checkKeyHitDelay(keyName, delay) {
+        // See if we have recorded a hit time for this key already - if not then set the hit time as zero.
+        var lastHit = keyHitTime[keyName] ? keyHitTime[keyName] : 0;
+        // What time is it now, 
+        var curTime = Date.now();
+        // Does the elapsed time exceed the required delay time.
+        if ( curTime-lastHit >= delay ) {
+            // If it does then update the key hit time ...
+            keyHitTime[keyName] = curTime;
+            // and return true
+            return true;
+        }
+        // Otherwise disregard this key press.
+        return false;
+    }
+```
+
+### Collision Detection
+Now that we have most of our core elements on screen let's look at how we detect when they collide. The rules are as follows:
+- When a bullet hits an enemy the enemy is destroyed
+- When an enemy hits the player the gunship is destroyed (and the game is over).
+
+In order to do this we need to go through the list of enemies and check to see if they collide. If two of our sprites overlap we consider that a collision has occured. So we can write the outline of our collision detection as follows:
+
+```javascript
+	enemies.forEach(function(nme){
+		bullets.forEach(function(bullet) {
+			if ( overlap(bullet, nme) ) {
+				alert("Bullet kills enemy");
+			}
+		});
+		
+		if ( overlap(playerSprite,nme) ) {
+			alert("Player dies!!");
+		}
+	});
+```
+
+So now all we need to do it write a function called ```overlap``` to check if the two objects overlap and our collision detection is complete. This function should return the value true if the two objects overlap and false otherwise.
+
+```javascript
+	function overlap( s1, s2 ) {
+	
+	}
+```
+
+Our overlap function looks at the two objects as boxes and checks that the lines outlining these boxes don't intersect. So we need to find the addresses of the lines that represent the outline of the box.
+```
+	// For simplicity we calculate the lines surrounding each of the sprites.
+	var s1_lines = { top : s1.getPosition().top, bottom: s1.getPosition().top+s1.getSize().h,
+					 left: s1.getPosition().left, right: s1.getPosition().left + s1.getSize().w };
+	var s2_lines = { top : s2.getPosition().top, bottom: s2.getPosition().top+s2.getSize().h,
+					 left: s2.getPosition().left, right: s2.getPosition().left + s2.getSize().w };
+```
+
+Now we can construct an expression that returns true or false depending on whether the two boxes defined by the lines overlap or not. The boxes overlap if the following expression is true:
+```javascript
+	// Check top left and right corners against the 4 sides of s2
+	((s1_lines.top >= s2_lines.top && s1_lines.top <= s2_lines.bottom &&
+		((s1_lines.left >= s2_lines.left && s1_lines.left <= s2_lines.right) ||
+		 (s1_lines.right >= s2_lines.left && s1_lines.right <= s2_lines.right))) ||
+	// Check bottom left & right corners of s1 against 4 sides of s2
+	(s1_lines.bottom >= s2_lines.top && s1_lines.bottom <= s2_lines.bottom && 
+		((s1_lines.left >= s2_lines.left && s1_lines.left <= s2_lines.right) ||
+		 (s1_lines.right >= s2_lines.left && s1_lines.right <= s2_lines.right))));
+```
+We can simply return the value of this expression from our overlap function. So the finished function looks like this:
+```javascript
+	function overlap( s1, s2 ) {
+		// For simplicity we calculate the lines surrounding each of the sprites.
+		var s1_lines = { top : s1.getPosition().top, bottom: s1.getPosition().top+s1.getSize().h,
+		                 left: s1.getPosition().left, right: s1.getPosition().left + s1.getSize().w };
+		var s2_lines = { top : s2.getPosition().top, bottom: s2.getPosition().top+s2.getSize().h,
+		                 left: s2.getPosition().left, right: s2.getPosition().left + s2.getSize().w };
+		
+
+		// Check top left & right corners of s1 against 4 sides of s2
+		return	((s1_lines.top >= s2_lines.top && s1_lines.top <= s2_lines.bottom &&
+			  ((s1_lines.left >= s2_lines.left && s1_lines.left <= s2_lines.right) ||
+			   (s1_lines.right >= s2_lines.left && s1_lines.right <= s2_lines.right))) ||
+			// Check bottom left & right corners of s1 against 4 sides of s2
+			(s1_lines.bottom >= s2_lines.top && s1_lines.bottom <= s2_lines.bottom && 
+			  ((s1_lines.left >= s2_lines.left && s1_lines.left <= s2_lines.right) ||
+			   (s1_lines.right >= s2_lines.left && s1_lines.right <= s2_lines.right))));
+	}
+```
+
+Now if we reload our game and move the player in front of the enemy sprite, when the two meet we should see the message "Player dies!!" appear in an alert box. 
+
+Reload the game again and this time shoot the enemy sprite. When the bullet hits the sprite the message "Bullet kills enemy" should appear in the alert box.
+
+Now we just need to do something useful (rather than issue an alert message) when these collisions are detected.

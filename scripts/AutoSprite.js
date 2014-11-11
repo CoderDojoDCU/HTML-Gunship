@@ -2,7 +2,7 @@
  * This class sub-classes our existing sprite class. It adds the capability for the sprite to automatically move on the canvas
  */
 function AutoSprite(pixelsPerFrame, spriteDirection, spriteMap, top, left, w, h, fr, frames, frameDir, doOnce) {
-    Sprite.call(this,spriteMap,top,left,w,h,fr,frames,frameDir,doOnce);
+    Sprite.call(this,spriteMap,left,top,w,h,fr,frames,frameDir,doOnce);
 
     // The sign of pixelsPerFrame affects the direction e.g. horizontal direction with a positive pixelsPerFrame
     // means that the sprite is moving from left to right, while a negative value moves it from right to left.

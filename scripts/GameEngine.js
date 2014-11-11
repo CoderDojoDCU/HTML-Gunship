@@ -8,6 +8,7 @@ function GameEngine(gameCanvas, imageCache) {
 		
 	var MOVE_PIXELS = 3;
 	var BULLET_SPEED = 5;
+    var KEY_REPEAT_DELAY = 250;     // Milliseconds between registered keypresses
 	// Get the drawing context that we're going to use to draw on our game surface.
 	var drawCtx = theCanvas.getContext("2d");
 	
@@ -31,6 +32,7 @@ function GameEngine(gameCanvas, imageCache) {
 	drawCtx.fillStyle = pattern;
 	
 	var keyStatusMap = {};
+    var keyHitTime = {};
 	
 	function setKeyStatus(keyEvent, status) {
 		switch( keyEvent.keyCode ) {
@@ -74,8 +76,42 @@ function GameEngine(gameCanvas, imageCache) {
 			if ( bullets.length > 0 ) {
 				renderSprites(bullets, framesElapsed);
 			}
+			
+			enemies.forEach(function(nme){
+				bullets.forEach(function(bullet) {
+					if ( overlap(bullet, nme) ) {
+						alert("Bullet kills enemy");
+					}
+				});
+				
+				if ( overlap(playerSprite,nme) ) {
+					alert("Player dies!!");
+				}
+			});
+			
+			
 		});
 		gameClock.start();
+	}
+	
+	// This function is used to detect overlaps between sprites. Returns true if the sprites overlap and false
+	// otherwise.
+	function overlap( s1, s2 ) {
+		// For simplicity we calculate the lines surrounding each of the sprites.
+		var s1_lines = { top : s1.getPosition().top, bottom: s1.getPosition().top+s1.getSize().h,
+		                 left: s1.getPosition().left, right: s1.getPosition().left + s1.getSize().w };
+		var s2_lines = { top : s2.getPosition().top, bottom: s2.getPosition().top+s2.getSize().h,
+		                 left: s2.getPosition().left, right: s2.getPosition().left + s2.getSize().w };
+		
+
+		// Check top left & right corners of s1 against 4 sides of s2
+		return	((s1_lines.top >= s2_lines.top && s1_lines.top <= s2_lines.bottom &&
+			  ((s1_lines.left >= s2_lines.left && s1_lines.left <= s2_lines.right) ||
+			   (s1_lines.right >= s2_lines.left && s1_lines.right <= s2_lines.right))) ||
+			// Check bottom left & rihgt corners of s1 against 4 sides of s2
+			(s1_lines.bottom >= s2_lines.top && s1_lines.bottom <= s2_lines.bottom && 
+			  ((s1_lines.left >= s2_lines.left && s1_lines.left <= s2_lines.right) ||
+			   (s1_lines.right >= s2_lines.left && s1_lines.right <= s2_lines.right))));
 	}
 	
 	// For each set of sprites that we need to render we 
@@ -120,19 +156,38 @@ function GameEngine(gameCanvas, imageCache) {
 					currentPlayerPos.top+(MOVE_PIXELS*framesElapsed)),
 				currentPlayerPos.left);
 		}
-		
-		if ( keyStatusMap["SPACE"] ) {
+
+		if ( keyStatusMap["SPACE"] && checkKeyHitDelay("SPACE", KEY_REPEAT_DELAY)) {
 			// Create the bullet sprites.
 			bullets = bullets.concat(createBulletSprites());
 		}
 	}
+
+    // This function returns a value of true or false depending on whether the required period has elapsed since the last time
+    // a keypress was recognised.
+    function checkKeyHitDelay(keyName, delay) {
+        // See if we have recorded a hit time for this key already - if not then set the hist time as zero.
+        var lastHit = keyHitTime[keyName] ? keyHitTime[keyName] : 0;
+        // What time is it now,
+        var curTime = Date.now();
+        // Does the elapsed time exceed the required delay time.
+        if ( curTime-lastHit >= delay ) {
+            // If it does then update the key hit time ...
+            keyHitTime[keyName] = curTime;
+            // and return true
+            return true;
+        }
+        // Otherwise disregard this key press.
+        return false;
+    }
 	
 	function createEnemySprite() {
-		var s = new AutoSprite(-1.66,'horizontal',imageCache.get('images/sprites.png'),78,0,80,39,10,[0,1,2,3,2,1],'horizontal');
+		var s = new AutoSprite(-1.66,'horizontal',imageCache.get('images/sprites.png'),0,78,80,39,10,[0,1,2,3,2,1],'horizontal');
 		var left = canvasWidth - 5;   // Left most part of sprite is 5px from RHS
 		var top = Math.min(Math.random()*canvasHeight, 
 								canvasHeight - s.getSize().h);
 		s.setPosition(top,left);
+        s['getType'] = function() {return "ENEMY";};
 		return s;
 	}
 	
@@ -140,6 +195,7 @@ function GameEngine(gameCanvas, imageCache) {
 		var s = new Sprite(imageCache.get('images/sprites.png'),5,0,39,25,10,[0,1]);
 		var top = Math.floor((canvasHeight - 39)/2);
 		s.setPosition(top,0);
+        s['getType'] = function() {return "PLAYER";};
 		return s;
 	}
 	
@@ -147,12 +203,17 @@ function GameEngine(gameCanvas, imageCache) {
 		var spos = playerSprite.getPosition();
 		var ssize = playerSprite.getSize();
 		
-		var forward = new AutoSprite(BULLET_SPEED, 'horizontal', imageCache.get('images/sprites.png'),39,0,17,7,0,[0],null,false);
+		var forward = new AutoSprite(BULLET_SPEED, 'horizontal', imageCache.get('images/sprites.png'),0,39,17,7,0,[0],null,false);
 		forward.setPosition( spos.top + (ssize.h/2) - (forward.getSize().h/2),
 							 spos.left + ssize.w);
-		var down = new AutoSprite(BULLET_SPEED,'vertical',imageCache.get('images/sprites.png'),50,0,9,5,0,[0],null,false);
-		var up = new AutoSprite(BULLET_SPEED,'vertical',imageCache.get('images/sprites.png'),60,0,9,5,0,[0],null,false);
-		
+
+        var down = new AutoSprite(BULLET_SPEED,'vertical',imageCache.get('images/sprites.png'),0,60,9,5,0,[0],null,false);
+        down.setPosition(spos.top+ssize.h, spos.left + (ssize.w/2) - (down.getSize().w/2) );
+		var up = new AutoSprite(-BULLET_SPEED,'vertical',imageCache.get('images/sprites.png'),0,50,9,5,0,[0],null,false);
+        up.setPosition( spos.top, spos.left + (ssize.w/2) - (up.getSize().w/2) );
+
+        forward['getType'] = up['getType'] = down['getType'] = function() {return "BULLET";};
+
 		return [forward,up,down];
 	}
 }
