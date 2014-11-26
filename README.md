@@ -1573,3 +1573,77 @@ Now if we reload our game and move the player in front of the enemy sprite, when
 Reload the game again and this time shoot the enemy sprite. When the bullet hits the sprite the message "Bullet kills enemy" should appear in the alert box.
 
 Now we just need to do something useful (rather than issue an alert message) when these collisions are detected.
+
+###Making things go BOOM!
+Instead of simply issuing an alert message when a bullet hits an enemy we want to:
+- Create an explosion at the point of impact
+- Remove the enemy that is hit
+- Remove the bullet that hit the enemy
+
+Of course we can have several explosions going on at the same time. So we are going to need a container to manage them. Just like the bullets and the enemies we use an array to store references to the explosions that are live. So just below where we created the array to manage the bullets we add the following lines:
+```javascript
+	// Manage explosions
+	var explosions = [];
+```
+
+Now we will write a function that we can call to create an explosion at a given point:
+```javascript
+	function createExplosionAt( top, left ) {
+		var boom = new Sprite(imageCache.get("images/sprites.png"),116,0,39,39,4,[0,1,2,3,4,5,6,7,8,9,10,11],'horizontal',true);
+		boom.setPosition(top,left);
+		return boom;
+	}
+```
+
+As you can see this function returns a reference to the explosion object created. So we replace the alert that we show when a bullet hits an enemy with the following:
+```javascript
+	explosions.push(createExplosionAt(bullet.getPosition().top, bullet.getPosition().left));
+```
+
+Of course this will only create an explosion - the bullet and the enemy will continue their progress across the canvas. We need to find a way to remove these from the game.
+
+If you recall our Sprite object has an internal variable (done) that it uses to determine when the sprite is finished rendering. We already use this in the renderSprites function to remove the sprite from the display. Wouldn't it be handy if we could flag these sprites as 'done' when they've been blown up.
+
+We can allow a client class to change this value by adding the following lines to the ```Sprite``` class in ```Sprite.js```,
+```javascript
+	this.setDone = function( status ) {
+		done = status;
+	}
+```
+
+So now we can call this method for each of the sprites that are to be removed from the game when we drop the explosion. We can revise our Overlap check as follows:
+```javascript
+	if ( overlap(bullet, nme) ) {
+		bullet.setDone(true);
+		nme.setDone(true);
+		explosions.push(createExplosionAt(bullet.getPosition().top, bullet.getPosition().left));
+	}
+```
+
+Re-running the game now we would expect to see our Enemy and the Bullet disappear when the explosion occurs. If you try it you will find that this isn't the case!! The reason why is that the ```done``` variable is re-evaluated each time the Sprites ```update``` function is called. Observe the following line at the end of the ```update``` function in Sprite.js
+```javascript
+	done = once && moveFrames > frameSet.length;
+``` 
+
+Regardless of what the current value of ```done``` is it will be reset on this line. This means that if the sprite is in the middle of the screen this line will change the value of ```done``` so that the sprite is nolonger ```done```.
+
+We need to change this so that if this variable already has a value of ```true``` then we don't change that. We could do that by adding an ```if``` statement in front of this line as follows:
+```javascript
+	if ( !done ) {
+		done = once && moveFrames > frameSet.length;
+	}
+```
+
+Alternatively we could use a simple logic evaluation as follows:
+```javascript
+	done = done || once && moveFrames > frameSet.length;
+```
+
+Of course this last option can be further abbreviated by using the ```|=``` operator as follows:
+```javascript
+	done |= once && moveFrames > frameSet.length;
+```
+
+So we can solve this bug by the simple addition of a vertical bar operator in front of the equals sign on this line.
+
+Once you've made the above change you should find that the enemy and the bullet will disappear when the explosion is created.

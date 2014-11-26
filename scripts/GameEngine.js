@@ -25,6 +25,8 @@ function GameEngine(gameCanvas, imageCache) {
 	// Just like the enemies, we can have a lot of bullets on screen.
 	// Manage these here.
 	var bullets = [];
+	// Manage explosions
+	var explosions = [];
 	
 	// We only need to create the pattern once so do it when we initialise the game engine.
 	var pattern = drawCtx.createPattern(imageCache.get('images/terrain.png'),"repeat");
@@ -76,11 +78,16 @@ function GameEngine(gameCanvas, imageCache) {
 			if ( bullets.length > 0 ) {
 				renderSprites(bullets, framesElapsed);
 			}
+			if ( explosions.length > 0 ) {
+				renderSprites(explosions,framesElapsed);
+			}
 			
 			enemies.forEach(function(nme){
 				bullets.forEach(function(bullet) {
 					if ( overlap(bullet, nme) ) {
-						alert("Bullet kills enemy");
+						bullet.setDone(true);
+						nme.setDone(true);
+						explosions.push(createExplosionAt(bullet.getPosition().top, bullet.getPosition().left));
 					}
 				});
 				
@@ -215,5 +222,11 @@ function GameEngine(gameCanvas, imageCache) {
         forward['getType'] = up['getType'] = down['getType'] = function() {return "BULLET";};
 
 		return [forward,up,down];
+	}
+	
+	function createExplosionAt( top, left ) {
+		var boom = new Sprite(imageCache.get("images/sprites.png"),116,0,39,39,4,[0,1,2,3,4,5,6,7,8,9,10,11],'horizontal',true);
+		boom.setPosition(top,left);
+		return boom;
 	}
 }

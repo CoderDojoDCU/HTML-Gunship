@@ -50,7 +50,7 @@ function Sprite(spriteMap, top, left, width, height, fr, frames, frameDir, doOnc
 			// For single animations we're finished when the number
 			// of frames we've moved exceeds the number of frames
 			// in our frameSet.
-			done = once && moveFrames > frameSet.length;
+			done |= once && moveFrames > frameSet.length;
 		}
 	};
 	
@@ -111,4 +111,8 @@ function Sprite(spriteMap, top, left, width, height, fr, frames, frameDir, doOnc
 	this.isDone = function() {
 		return done;
 	};
+	
+	this.setDone = function( status ) {
+		done = status;
+	}
 }
