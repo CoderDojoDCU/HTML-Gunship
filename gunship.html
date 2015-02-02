@@ -11,7 +11,11 @@
 		<script src="scripts/GameEngine.js" type="text/javascript"></script>
 	</head>
 	<body>
+		<div id="canvasTop">
+			SCORE: <div class="setInline width50" id="scoreDiv">0</div>
+		</div>
 		<div id="gameDiv">
+			<div id="gameOver" hidden="true">Game Over</div>
 			<canvas id="gameCanvas" width='512' height='480'/>
 		</div>
 	</body>

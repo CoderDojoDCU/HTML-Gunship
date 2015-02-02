@@ -1,8 +1,54 @@
+body {
+	background-color: black;
+	font-family: 'Courier New', Courier, 'Lucida Sans Typewriter', 'Lucida Typewriter', monospace;
+	font-style: normal;
+	font-variant: normal;
+	font-weight: bold;	
+}
+
 #gameDiv {
-	margin-top: 50px;
-	margin-left: auto;
+ 	margin-left: auto;
 	margin-right: auto;
 	width: 512px;
 	height: 480px;
+}
+
+#gameCanvas {
 	border: 2px solid gray;
+	z-index: 1;
+}
+
+#canvasTop {
+	margin-top: 40px;
+	width: 512px;
+	text-align: right;
+	margin-left: auto;
+	margin-right: auto;
+	color: green;
+	font-size: 24px;
+}
+
+.setInline {
+	display: inline-block;
+}
+
+.width50 {
+	width: 50px;
+}
+
+#gameOver {
+	border: 2px solid gray;
+	width: 512px;
+	height: 480px;
+	margin-left: auto;
+	margin-right: auto;
+	padding-top: auto;
+	padding-bottom: auto;
+	background-color: gray;
+	text-align: center;
+	opacity: 0.5;	 
+	/*visibility: hidden; */
+	position: absolute;
+	font-size: 30pt;
+	z-index:10;
 }

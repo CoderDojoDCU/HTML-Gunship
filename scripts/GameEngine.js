@@ -28,10 +28,22 @@ function GameEngine(gameCanvas, imageCache) {
 	// Manage explosions
 	var explosions = [];
 	
+	// keep track of the start time so that we can determine how long the game has been running.
+	var gameStartTime = 0;
+	var ENEMY_ADDITION_INCREMENT = 0.05;// Every time we ratchet up the level this specifies how much we increment by
+	var initialAdditionRate = 0.05;		// Initial rate for adding enemies.
+	var MS_PER_INCREMENT = 15000;		// Ratchet up the level every 15secs.
+	var MAX_ENEMIES = 100;
+	
 	// We only need to create the pattern once so do it when we initialise the game engine.
 	var pattern = drawCtx.createPattern(imageCache.get('images/terrain.png'),"repeat");
 	// The fill style isn't going to change throughout our game.
 	drawCtx.fillStyle = pattern;
+	
+	// An array that we use to store a set of callbacks for events
+	var scoreEventListeners = [];
+	// Add an array for done listeners
+	var playerDestroyedListeners = [];
 	
 	var keyStatusMap = {};
     var keyHitTime = {};
@@ -56,7 +68,38 @@ function GameEngine(gameCanvas, imageCache) {
 		}
 	}
 	
+	this.addScoreListener = function(listener) {
+		scoreEventListeners.push(listener);
+	}
+	
+	this.removeScoreListener = function(listener) {
+		for(var ix = 0; ix< scoreEventListeners.length; ix++ ) {
+			if ( scoreEventListeners[ix] === listener ) {
+				scoreEventListeners.split(ix,1);
+				break;
+			}
+		}
+	}
+	
+	function notifyScoreUpdate( score ) {
+		var scoreEvent = { score: score };
+		scoreEventListeners.forEach(function(listener) {
+			listener(scoreEvent);
+		});
+	}
+	
+	this.addPlayerDestroyedListener = function(listener) {
+		playerDestroyedListeners.push(listener);
+	}
+	
+	function notifyPlayerDestroyedListeners() {
+		playerDestroyedListeners.forEach(function(listener) {
+			listener();
+		});
+	}
+	
 	this.init = function() {
+		gameStartTime = Date.now()
 		$(document).keydown(function(keyEvent) {
 			setKeyStatus(keyEvent,true);
 		});
@@ -67,7 +110,10 @@ function GameEngine(gameCanvas, imageCache) {
 	
 		enemies.push(createEnemySprite());
 		gameClock.registerStep(function(framesElapsed,curFrameNo) {
-			checkPlayerActions(framesElapsed);
+			Array.prototype.push.apply(enemies,addEnemies());
+			if ( !playerSprite.isDone() ) {
+				checkPlayerActions(framesElapsed);
+			}
 			drawCtx.fillRect(0,0,theCanvas.width, theCanvas.height);
 			playerSprite.update(framesElapsed);
 			playerSprite.render(drawCtx);
@@ -88,17 +134,42 @@ function GameEngine(gameCanvas, imageCache) {
 						bullet.setDone(true);
 						nme.setDone(true);
 						explosions.push(createExplosionAt(bullet.getPosition().top, bullet.getPosition().left));
+						notifyScoreUpdate(10);
 					}
 				});
 				
-				if ( overlap(playerSprite,nme) ) {
-					alert("Player dies!!");
+				if ( !playerSprite.isDone() &&  overlap(playerSprite,nme) ) {
+					playerSprite.setDone(true);
+					explosions.push(createExplosionAt(playerSprite.getPosition().top, playerSprite.getPosition().left));
+					notifyPlayerDestroyedListeners();
 				}
 			});
 			
 			
 		});
 		gameClock.start();
+	}
+	
+	// Calculates when to add another enemy and returns an array of enemies that were created.
+	function addEnemies() {
+		var elapsedTimeMillis = Date.now() - gameStartTime;
+		// Our current difficulty level is based on the number MS Increments that have elapsed since the game started which would be elapsedTime/MS_PER_INCREMENT.
+		// Current difficulty level is that value multipled by the ENEMY_ADDITION_INCREMENT.
+		// And then we add the initial difficulty level.
+		// initialAdditionRate + (ENEMY_ADDITION_INCREMENT * elapedTimeMillis/MS_PER_INCREMENT)
+		// We use Math.floor to make sure that elapsedTimeMillis/MS_PER_INCERMENT always returns an integer.
+		// currentLevel is going to go 0.05, 0.10, 0.15, 0.20 ... 1.00
+		// We want to limit it to a max of 1 so surround it by a call to Math.min
+		var currentLevel = Math.min(initialAdditionRate + ( ENEMY_ADDITION_INCREMENT * Math.floor(elapsedTimeMillis / MS_PER_INCREMENT)),1);
+		var currentMaxEnemies = Math.floor(MAX_ENEMIES * currentLevel);
+		var numToCreate = currentMaxEnemies - enemies.length;
+		if (numToCreate < 0) numToCreate = 0;
+		
+		var newEnemies = [];
+		while(numToCreate-- > 0) {
+			newEnemies.push(createEnemySprite());
+		}
+		return newEnemies;
 	}
 	
 	// This function is used to detect overlaps between sprites. Returns true if the sprites overlap and false
